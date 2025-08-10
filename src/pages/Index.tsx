@@ -3,11 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('occupancy');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showSettings, setShowSettings] = useState(false);
+  const [constants, setConstants] = useState({
+    breakfastPrice: 3500,
+    seasonMultiplier: 1.2,
+    competitorCoeff: 0.95
+  });
 
   // Данные для расчета цен
   const roomTypes = [
@@ -25,11 +35,7 @@ const Index = () => {
     { label: "80%+", multiplier: 1.6 }
   ];
 
-  const constants = {
-    breakfastPrice: 3500,
-    seasonMultiplier: 1.2,
-    competitorCoeff: 0.95
-  };
+
 
   // Расчет цены
   const calculatePrice = (basePrice: number, guests: number, multiplier: number, view: string) => {
@@ -60,6 +66,33 @@ const Index = () => {
     { hotel: 'Альпина Резорт', price: 45200, bookings: 128 },
     { hotel: 'Горный Дом', price: 38900, bookings: 167 },
   ];
+
+  // Генерируем календарные данные на месяц вперед
+  const generateCalendarData = () => {
+    const data = [];
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      const occupancy = Math.floor(Math.random() * 40) + 60; // 60-100%
+      const revenue = occupancy * 1000 + Math.random() * 20000;
+      data.push({
+        date: date.toISOString().split('T')[0],
+        day: date.getDate(),
+        weekday: date.toLocaleDateString('ru-RU', { weekday: 'short' }),
+        occupancy,
+        revenue: Math.round(revenue),
+        forecast: Math.random() > 0.7 ? 'high' : Math.random() > 0.3 ? 'medium' : 'low'
+      });
+    }
+    return data;
+  };
+
+  const calendarData = generateCalendarData();
+
+  const updateConstant = (key: string, value: number) => {
+    setConstants(prev => ({ ...prev, [key]: value }));
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -166,7 +199,185 @@ const Index = () => {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          {/* Календарь прогнозов */}
+          <Card className="xl:col-span-2 bg-white shadow-sm border-gray-200">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Icon name="Calendar" size={20} className="mr-2 text-green-600" />
+                  Прогноз загрузки на месяц
+                </div>
+                <Dialog open={showSettings} onOpenChange={setShowSettings}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Icon name="Settings" size={16} className="mr-2" />
+                      Настройки
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Настройки констант</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-6 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="breakfast">Цена завтрака (₽)</Label>
+                        <Input
+                          id="breakfast"
+                          type="number"
+                          value={constants.breakfastPrice}
+                          onChange={(e) => updateConstant('breakfastPrice', Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="season">Сезонный коэффициент</Label>
+                        <Input
+                          id="season"
+                          type="number"
+                          step="0.1"
+                          value={constants.seasonMultiplier}
+                          onChange={(e) => updateConstant('seasonMultiplier', Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="competitor">Коэффициент конкурентов</Label>
+                        <Input
+                          id="competitor"
+                          type="number"
+                          step="0.01"
+                          value={constants.competitorCoeff}
+                          onChange={(e) => updateConstant('competitorCoeff', Number(e.target.value))}
+                        />
+                      </div>
+                      <Button 
+                        onClick={() => setShowSettings(false)} 
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        Сохранить настройки
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => (
+                  <div key={day} className="text-center text-sm font-medium text-gray-600 p-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-2">
+                {calendarData.slice(0, 21).map((day, index) => {
+                  const bgColor = 
+                    day.occupancy >= 90 ? 'bg-red-100 border-red-300 text-red-900' :
+                    day.occupancy >= 75 ? 'bg-yellow-100 border-yellow-300 text-yellow-900' :
+                    'bg-green-100 border-green-300 text-green-900';
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-105 ${bgColor}`}
+                      onClick={() => setSelectedDate(new Date(day.date))}
+                    >
+                      <div className="text-center">
+                        <div className="text-sm font-bold">{day.day}</div>
+                        <div className="text-xs mt-1">{day.occupancy}%</div>
+                        {day.forecast === 'high' && (
+                          <Icon name="TrendingUp" size={12} className="mx-auto mt-1" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between items-center mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-green-100 border-2 border-green-300 rounded"></div>
+                    <span className="text-sm text-gray-600">60-75%</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-yellow-100 border-2 border-yellow-300 rounded"></div>
+                    <span className="text-sm text-gray-600">75-90%</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-red-100 border-2 border-red-300 rounded"></div>
+                    <span className="text-sm text-gray-600">90%+</span>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Средняя загрузка: <span className="font-bold text-gray-900">82%</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Детали выбранного дня */}
+          <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200">
+            <CardHeader>
+              <CardTitle className="flex items-center text-indigo-900">
+                <Icon name="Calendar" size={20} className="mr-2" />
+                {selectedDate.toLocaleDateString('ru-RU', { 
+                  day: 'numeric',
+                  month: 'long',
+                  weekday: 'long'
+                })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-white rounded-lg border border-indigo-200">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Прогноз загрузки</span>
+                  <span className="text-lg font-bold text-indigo-900">85%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="bg-indigo-600 h-3 rounded-full" style={{ width: '85%' }}></div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-white rounded-lg border border-indigo-200">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Ожидаемый доход</span>
+                  <span className="text-lg font-bold text-green-700">₽156,000</span>
+                </div>
+                <p className="text-xs text-gray-500">+12% к среднему</p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-indigo-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm">Стандарт Мини</span>
+                  </div>
+                  <span className="text-sm font-medium">2/2</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-indigo-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="text-sm">Стандарт</span>
+                  </div>
+                  <span className="text-sm font-medium">4/5</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-indigo-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <span className="text-sm">Люкс 3к</span>
+                  </div>
+                  <span className="text-sm font-medium">1/1</span>
+                </div>
+              </div>
+
+              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Icon name="Eye" size={16} className="mr-2" />
+                Подробная аналитика
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
           {/* Матрица цен */}
           <Card className="bg-white shadow-sm border-gray-200">
             <CardHeader>
